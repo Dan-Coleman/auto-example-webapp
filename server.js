@@ -1,23 +1,21 @@
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
+
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
-const EventHubReader = require('./scripts/event-hub-reader.js');
+const ServiceBusReader = require('./scripts/service-bus-reader.js');
 
-const iotHubConnectionString = process.env.IotHubConnectionString;
-if (!iotHubConnectionString) {
-  console.error(`Environment variable IotHubConnectionString must be specified.`);
+console.debug(process.env);
+
+const serviceBusConnectionString = process.env.serviceBusConnectionString;
+if (!serviceBusConnectionString) {
+  console.error(`Environment variable ServiceBusConnectionString must be specified.`);
   return;
 }
-console.log(`Using IoT Hub connection string [${iotHubConnectionString}]`);
-
-const eventHubConsumerGroup = process.env.EventHubConsumerGroup;
-console.log(eventHubConsumerGroup);
-if (!eventHubConsumerGroup) {
-  console.error(`Environment variable EventHubConsumerGroup must be specified.`);
-  return;
-}
-console.log(`Using event hub consumer group [${eventHubConsumerGroup}]`);
+console.log(`Using Service Bus connection string [${serviceBusConnectionString}]`);
 
 // Redirect requests to the public subdirectory to the root
 const app = express();
@@ -46,20 +44,39 @@ server.listen(process.env.PORT || '3000', () => {
   console.log('Listening on %d.', server.address().port);
 });
 
-const eventHubReader = new EventHubReader(iotHubConnectionString, eventHubConsumerGroup);
+const serviceBusReader = new ServiceBusReader(serviceBusConnectionString);
+
+const myMessageHandler = async (message) => {
+  // your code here
+  console.log(`message.body: ${message.body}`);
+
+  try {
+
+    console.debug(message);
+
+    const payload = {
+      data: message.body
+    };
+
+    // const payload = {
+    //   IotData: message,
+    //   MessageDate: date || Date.now().toISOString(),
+    //   DeviceId: deviceId,
+    // };
+
+    wss.broadcast(JSON.stringify(payload));
+  } catch (err) {
+    console.error('Error broadcasting: [%s] from [%s].', err, message);
+  }
+
+};
+const myErrorHandler = async (args) => {
+  console.log(
+    `Error occurred with ${args.entityPath} within ${args.fullyQualifiedNamespace}: `,
+    args.error
+  );
+};
 
 (async () => {
-  await eventHubReader.startReadMessage((message, date, deviceId) => {
-    try {
-      const payload = {
-        IotData: message,
-        MessageDate: date || Date.now().toISOString(),
-        DeviceId: deviceId,
-      };
-
-      wss.broadcast(JSON.stringify(payload));
-    } catch (err) {
-      console.error('Error broadcasting: [%s] from [%s].', err, message);
-    }
-  });
+  await serviceBusReader.startReadMessage(myMessageHandler, myErrorHandler);
 })().catch();

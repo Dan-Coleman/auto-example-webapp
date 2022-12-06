@@ -2,6 +2,7 @@
 /* eslint-disable no-restricted-globals */
 /* eslint-disable no-undef */
 $(document).ready(() => {
+
   // if deployed to a site supporting SSL, use wss://
   const protocol = document.location.protocol.startsWith('https') ? 'wss://' : 'ws://';
   const webSocket = new WebSocket(protocol + location.host);
@@ -138,6 +139,11 @@ $(document).ready(() => {
     try {
       const messageData = JSON.parse(message.data);
       console.log(messageData);
+
+      Swal.fire({
+        text: JSON.stringify(messageData),
+        timer: 15000
+      });
 
       // time and either temperature or humidity are required
       if (!messageData.MessageDate || (!messageData.IotData.temperature && !messageData.IotData.humidity)) {
